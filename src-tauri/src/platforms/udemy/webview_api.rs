@@ -21,8 +21,8 @@ pub async fn ensure_api_webview(
         "udemy-api",
         tauri::WebviewUrl::External(base_url.parse().unwrap()),
     )
-    .visible(false)
-    .inner_size(100.0, 100.0)
+    .visible(true)
+    .inner_size(800.0, 600.0)
     .initialization_script(
         r#"window.__omniget_fetch = function(url) {
             fetch(url, {
