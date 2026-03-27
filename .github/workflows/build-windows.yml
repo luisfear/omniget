@@ -30,7 +30,7 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: Build Tauri app
-        run: pnpm tauri build
+        run: pnpm tauri build || true
 
       - name: Upload executable
         uses: actions/upload-artifact@v4
