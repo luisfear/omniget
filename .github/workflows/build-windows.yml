@@ -10,11 +10,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Remove signing key from config
+      - name: Disable signing
         run: |
-          $conf = Get-Content src-tauri/tauri.conf.json -Raw
-          $conf = $conf -replace '"pubkey":\s*"[^"]*"', '"pubkey": ""'
-          Set-Content src-tauri/tauri.conf.json $conf
+          (Get-Content src-tauri/tauri.conf.json -Raw) -replace '"pubkey":\s*"[^"]*"', '"pubkey": ""' | Set-Content src-tauri/tauri.conf.json
         shell: pwsh
 
       - name: Setup Node.js
@@ -44,5 +42,4 @@ jobs:
         with:
           name: omniget-visible-webview
           path: |
-            src-tauri/target/release/omniget.exe
             src-tauri/target/release/bundle/nsis/*.exe
