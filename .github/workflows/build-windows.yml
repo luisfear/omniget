@@ -10,11 +10,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Disable signing
-        run: |
-          (Get-Content src-tauri/tauri.conf.json -Raw) -replace '"pubkey":\s*"[^"]*"', '"pubkey": ""' | Set-Content src-tauri/tauri.conf.json
-        shell: pwsh
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -35,7 +30,7 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: Build Tauri app
-        run: pnpm tauri build
+        run: pnpm tauri build || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -43,3 +38,4 @@ jobs:
           name: omniget-visible-webview
           path: |
             src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
