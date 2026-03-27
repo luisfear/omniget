@@ -41,7 +41,6 @@ pub async fn ensure_api_webview(
             }
         });
 
-        // Send data in chunks to avoid URL length limits
         window.__omniget_send_result = function(text) {
             var CHUNK_SIZE = 8000;
             if (text.length <= CHUNK_SIZE) {
@@ -106,19 +105,14 @@ pub async fn ensure_api_webview(
                         return false;
                     }
                     "chunk" => {
-                        // Get chunk data from 'd' parameter
                         for (k2, v2) in url.query_pairs() {
                             if k2 == "d" {
                                 let mut guard = store.lock().unwrap();
-                                let current = guard.get_or_insert_with(String::new);
-                                if current == "__CHUNKS__" || current.is_empty() {
+                                let current = guard.get_or_insert_with(|| String::from("__CHUNKS__"));
+                                if !current.starts_with("__CHUNKS__") {
                                     *current = String::from("__CHUNKS__");
                                 }
-                                // Append after the marker
-                                if current.starts_with("__CHUNKS__") {
-                                    let data_part = current.strip_prefix("__CHUNKS__").unwrap_or("").to_string();
-                                    *current = format!("__CHUNKS__{}{}", data_part, v2);
-                                }
+                                current.push_str(&v2);
                                 tracing::info!("[udemy-webview] Got chunk {}, accumulated length: {}", value, current.len());
                                 break;
                             }
@@ -129,7 +123,7 @@ pub async fn ensure_api_webview(
                         let mut guard = store.lock().unwrap();
                         if let Some(ref mut val) = *guard {
                             if val.starts_with("__CHUNKS__") {
-                                let assembled = val.strip_prefix("__CHUNKS__").unwrap_or("").to_string();
+                                let assembled = val["__CHUNKS__".len()..].to_string();
                                 tracing::info!("[udemy-webview] All chunks assembled, total length: {}", assembled.len());
                                 *val = assembled;
                             }
@@ -179,19 +173,17 @@ pub async fn webview_get(
     let timeout = Duration::from_secs(180);
     let mut poll_interval = 100u64;
     loop {
-        {
+        let status = {
             let guard = result_store.lock().unwrap();
-            if let Some(ref data) = *guard {
-                // Still receiving chunks, keep waiting
-                if data.starts_with("__CHUNKS__") {
-                    drop(guard);
-                    tokio::time::sleep(Duration::from_millis(poll_interval)).await;
-                    continue;
-                }
+            match guard.as_ref() {
+                None => 0,
+                Some(s) if s.starts_with("__CHUNKS__") => 1,
+                Some(_) => 2,
             }
-        }
+        };
 
-        if let Some(data) = result_store.lock().unwrap().take() {
+        if status == 2 {
+            let data = result_store.lock().unwrap().take().unwrap();
             if let Some(err_msg) = data.strip_prefix("{\"__fetch_error\":\"") {
                 let err_msg = err_msg.trim_end_matches("\"}");
                 tracing::error!("[udemy-webview] Fetch returned error after {:.1}s: {}", start.elapsed().as_secs_f64(), err_msg);
@@ -200,6 +192,7 @@ pub async fn webview_get(
             tracing::info!("[udemy-webview] Response received after {:.1}s, {} bytes", start.elapsed().as_secs_f64(), data.len());
             return Ok(data);
         }
+
         if start.elapsed() > timeout {
             tracing::error!("[udemy-webview] TIMEOUT after {}s", timeout.as_secs());
             return Err(anyhow!(
